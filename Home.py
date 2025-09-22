@@ -5,32 +5,31 @@ st.set_page_config(layout="wide")
 
 # Customize the sidebar
 markdown = """
-A Streamlit map template
+An working example module 1 and 3 of Epistem land cover mapping platform. Adapted from:
 <https://github.com/opengeos/streamlit-map-template>
 """
 
 st.sidebar.title("About")
 st.sidebar.info(markdown)
-logo = "https://i.imgur.com/UbOXYAU.png"
+logo = "logos\logo_epistem.png"
 st.sidebar.image(logo)
 
 # Customize page title
-st.title("Streamlit for Geospatial Applications")
+st.title("Epistem land cover mapping platform")
 
 st.markdown(
     """
-    This multipage app template demonstrates various interactive web apps created using [streamlit](https://streamlit.io) and [leafmap](https://leafmap.org). It is an open-source project and you are very welcome to contribute to the [GitHub repository](https://github.com/opengeos/streamlit-map-template).
+    This multipage platform aims to demonstrate a working example of epistem's first module, aim to generate a Landsat imagery for certain area of interest.
     """
 )
 
 st.header("Instructions")
 
 markdown = """
-1. For the [GitHub repository](https://github.com/opengeos/streamlit-map-template) or [use it as a template](https://github.com/opengeos/streamlit-map-template/generate) for your own project.
-2. Customize the sidebar by changing the sidebar text and logo in each Python files.
-3. Find your favorite emoji from https://emojipedia.org.
-4. Add a new app to the `pages/` directory with an emoji in the file name, e.g., `1_🚀_Chart.py`.
-
+1. Define the area of interest by drawing a rectangle on the map or upload a shapefile (zip).
+2. Specified the acqusition year of date. If you just type the year, the map will automatically filtered image from January 1 all the way to December 31.
+3. Specified the cloud cover percentage and sensor type (currently support Landsat 5 TM - Landsat 9 OLI2).
+4. click run to generate the mosaic image.
 """
 
 st.markdown(markdown)
