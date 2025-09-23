@@ -6,6 +6,7 @@ import tempfile
 import zipfile
 import os
 import ee
+import datetime
 ee.Authenticate()
 ee.Initialize()
 
@@ -62,17 +63,39 @@ if uploaded_file:
 #User input, search criteria
 st.subheader("Specify Imagery Search Criteria")
 st.text("Enter the acquisition date range, cloud cover percentage, and Landsat mission type. " \
-"Current platform support Landsat 5, 7, 8 and 9 surface reflectance data. Landsat mission date range as follows:")
-st.markdown("1. L5_SR: Landsat 5 (1984 - 2012)")
-st.markdown("2. L7_SR: Landsat 7 (1999 - 2021)")
-st.markdown("3. L8_SR: Landsat 8 (2013 - present)")
-st.markdown("4. L9_SR: Landsat 9 (2021 - present)")
+"Current platform support Landsat 5-9 Collection 2 Level 2 Analysis Ready Data (ARD), excluding the thermal bands. Landsat mission avaliability is as follows:")
+st.markdown("1. Landsat 5 Thematic Mapper (1984 - 2012)")
+st.markdown("2. Landsat 7 Enhanced Thematic Mapper Plus (1999 - 2021)")
+st.markdown("3. Landsat 8 Operational Land Imager (2013 - present)")
+st.markdown("4. Landsat 9 Operational Land Imager-2 (2021 - present)")
 #specified the avaliable sensor type
 sensor_type = ['L5_SR', 'L7_SR', 'L8_SR', 'L9_SR']
 #create a selection box for sensor type
-optical_data = st.selectbox("Select Landsat Sensor:", sensor_type, index=2)
-start_date = st.text_input("Start Date (YYYY-MM-DD or YYYY):", "2020-01-01")
-end_date = st.text_input("End Date (YYYY-MM-DD or YYYY):", "2020-12-31")
+
+# Map friendly names to internal codes
+sensor_dict = {
+    "Landsat 5 Thematic Mapper": "L5_SR",
+    "Landsat 7 Enhanced Thematic Mapper Plus": "L7_SR",
+    "Landsat 8 Operational Land Imager": "L8_SR",
+    "Landsat 9 Operational Land Imager-2": "L9_SR"
+}
+sensor_names = list(sensor_dict.keys())
+
+# Use friendly names in the selectbox
+selected_sensor_name = st.selectbox("Select Landsat Sensor:", sensor_names, index=2)
+optical_data = sensor_dict[selected_sensor_name]  # This is what you pass to your backend
+
+# Set default dates
+default_start = datetime.date(2020, 1, 1)
+default_end = datetime.date(2020, 12, 31)
+
+start_date_dt = st.date_input("Start Date:", default_start)
+end_date_dt = st.date_input("End Date:", default_end)
+
+# Convert to string format for backend compatibility
+start_date = start_date_dt.strftime("%Y-%m-%d")
+end_date = end_date_dt.strftime("%Y-%m-%d")
+
 cloud_cover = st.slider("Maximum Cloud Cover (%):", 0, 100, 30)
 
 #Search the landsat imagery
