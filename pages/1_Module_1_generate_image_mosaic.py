@@ -7,8 +7,6 @@ from src.src_modul_1 import Reflectance_Data, Reflectance_Stats
 import tempfile
 import zipfile
 import os
-import io
-import sys
 
 #module name
 markdown = """
@@ -77,7 +75,11 @@ if st.button("Search Landsat Imagery") and aoi:
     ### Landsat Imagery Search Summary
 
     - **Total Images Found:** {detailed_stats.get('total_images', 'N/A')}
-    - **Mean Cloud Cover:** {detailed_stats.get('mean_cloud_cover', 'N/A')}%
+    - **Date Range of Images:** {detailed_stats.get('date_range', 'N/A')}
+    - **Unique WRS Tiles:** {detailed_stats.get('unique_tiles', 'N/A')}
+    - **Scene IDs:** {', '.join(detailed_stats.get('scene_ids', [])) if detailed_stats.get('scene_ids') else 'N/A'} 
+    - **Image acquisition dates:** {', '.join(detailed_stats.get('individual_dates', [])) if detailed_stats.get('individual_dates') else 'N/A'}
+    - **Average Scene Cloud Cover:** {detailed_stats.get('mean_cloud_cover', 'N/A')}%
     - **Date Range:** {detailed_stats.get('date_range', 'N/A')}
     - **Cloud Cover:** {detailed_stats.get('cloud_cover', 'N/A')}
     """
