@@ -6,10 +6,12 @@ import ee
 import tempfile
 import zipfile
 import os
+ee.Authenticate()
+ee.Initialize()
 
 
 #title of the module
-st.title("Upload and Analzye the Quality of Training Data/Region of Interest for Land Cover Classification")
+st.title("Analzye the Separability of Region of Interest (ROI)")
 st.markdown("This module is used so that user are able to perform separability analysis of the region of interest (ROI) data." \
 "The user must upload the training data in zip shape file format. The training data should contain the class ID and class names")
 #module name
@@ -50,12 +52,40 @@ if uploaded_file:
             st.error("No .shp file found in the uploaded zip.")
         else:
             gdf = gpd.read_file(shp_files[0])
-            st.success("AOI uploaded!")
-            # Convert to EE geometry
-            aoi = ee.FeatureCollection(gdf.__geo_interface__)
-            #Show a small preview map centered on AOI
-            st.text("Area of interest preview:")
-            centroid = gdf.geometry.centroid.iloc[0]
-            preview_map = geemap.Map(center=[centroid.y, centroid.x], zoom=10)
-            preview_map.add_geojson(gdf.__geo_interface__, layer_name="AOI")
-            preview_map.to_streamlit(height=300)
+            st.success("ROI uploaded!")
+            st.markdown("ROI table preview:")
+            st.write(gdf)
+            # Convert to EE FeatureCollection (supports Point, MultiPolygon, etc.)
+            features = []
+            for _, row in gdf.iterrows():
+                geom = row.geometry
+                props = row.drop('geometry').to_dict()
+                if geom.geom_type == "MultiPoint":
+                    for pt in geom.geoms:
+                        try:
+                            features.append(ee.Feature(pt.__geo_interface__, props))
+                        except Exception as e:
+                            st.error(f"Error converting MultiPoint geometry: {e}")
+                else:
+                    try:
+                        features.append(ee.Feature(geom.__geo_interface__, props))
+                    except Exception as e:
+                        st.error(f"Error converting geometry: {e}")
+            if features:
+                aoi = ee.FeatureCollection(features)
+                # Show a small preview map centered on AOI
+                st.text("Region of Interest data preview:")
+                # Prepare geometry for map preview (flatten MultiPoint to Points)
+                preview_geoms = []
+                for geom in gdf.geometry:
+                    if geom.geom_type == "MultiPoint":
+                        preview_geoms.extend(list(geom.geoms))
+                    else:
+                        preview_geoms.append(geom)
+                preview_gdf = gpd.GeoDataFrame(geometry=preview_geoms, crs=gdf.crs)
+                centroid = preview_gdf.geometry.centroid.iloc[0]
+                preview_map = geemap.Map(center=[centroid.y, centroid.x], zoom=10)
+                preview_map.add_geojson(preview_gdf.__geo_interface__, layer_name="ROI")
+                preview_map.to_streamlit(height=500)
+            else:
+                st.error("No valid features found in shapefile.")
