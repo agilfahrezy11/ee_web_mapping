@@ -15,7 +15,7 @@ logo = "logos\logo_epistem.png"
 st.sidebar.image(logo)
 
 # Customize page title
-st.title("Epistem land cover mapping platform")
+st.title("Epistem land cover mapping platform demo")
 
 st.markdown(
     """

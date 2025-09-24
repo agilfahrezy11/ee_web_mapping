@@ -81,21 +81,18 @@ sensor_dict = {
 }
 sensor_names = list(sensor_dict.keys())
 
-# Use friendly names in the selectbox
+#User can select the sensor type here
 selected_sensor_name = st.selectbox("Select Landsat Sensor:", sensor_names, index=2)
 optical_data = sensor_dict[selected_sensor_name]  # This is what you pass to your backend
-
 # Set default dates
 default_start = datetime.date(2020, 1, 1)
 default_end = datetime.date(2020, 12, 31)
-
 start_date_dt = st.date_input("Start Date:", default_start)
 end_date_dt = st.date_input("End Date:", default_end)
-
-# Convert to string format for backend compatibility
+#Convert the date format to be compatible with GEE
 start_date = start_date_dt.strftime("%Y-%m-%d")
 end_date = end_date_dt.strftime("%Y-%m-%d")
-
+#cloud cover slider
 cloud_cover = st.slider("Maximum Cloud Cover (%):", 0, 100, 30)
 
 #Search the landsat imagery
@@ -138,11 +135,9 @@ if st.button("Search Landsat Imagery") and aoi:
     - **Cloud Cover Range:** {detailed_stats.get('cloud_cover', {}).get('min', 'N/A')}% - {detailed_stats.get('cloud_cover', {}).get('max', 'N/A')}%
     """
     st.markdown(summary_md)
-
     # Optionally, display the full stats as a table
     #st.subheader("Detailed Statistics") {'bands': ['RED', 'GREEN', 'BLUE'], 'min': 0, 'max': 0.3}
     #st.write(detailed_stats)
-
     if detailed_stats['total_images'] > 0:
         #visualization parameters
         vis_params = {
@@ -156,10 +151,9 @@ if st.button("Search Landsat Imagery") and aoi:
         composite = collection.median().clip(aoi)
         # Display the image using geemap
         centroid = gdf.geometry.centroid.iloc[0]
-        m = geemap.Map(minimap_control=True, center=[centroid.y, centroid.x], zoom=10)
+        m = geemap.Map(center=[centroid.y, centroid.x], zoom=10)
         m.addLayer(composite, vis_params, 'Landsat Mosaic')
         m.add_geojson(gdf.__geo_interface__, layer_name="AOI")
         m.to_streamlit(height=600)
 else:
     st.info("Upload an AOI and specify search criteria to begin.")
-
