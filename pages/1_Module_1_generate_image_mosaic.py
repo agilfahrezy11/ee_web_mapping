@@ -146,13 +146,15 @@ if st.button("Search Landsat Imagery") and aoi:
         'gamma': [0.95, 1.1, 1],
         'bands':['NIR', 'RED', 'GREEN']
         }
-        #Compositing the image
-        first_image = collection.first().clip(aoi)
+        #Create and image composite/mosaic
         composite = collection.median().clip(aoi)
+        # Store in session state for use in other modules
+        st.session_state['composite'] = composite
         # Display the image using geemap
         centroid = gdf.geometry.centroid.iloc[0]
         m = geemap.Map(center=[centroid.y, centroid.x], zoom=10)
         m.addLayer(composite, vis_params, 'Landsat Mosaic')
+        m.addLayer(collection, vis_params, 'Landsat Collection', shown=False)
         m.add_geojson(gdf.__geo_interface__, layer_name="AOI")
         m.to_streamlit(height=600)
 else:
