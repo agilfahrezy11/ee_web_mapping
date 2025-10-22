@@ -3,17 +3,42 @@ import geopandas as gpd
 import pandas as pd
 import json
 import ee 
-ee.Initialize()
 import geemap
 from shapely.validation import make_valid
 from shapely.geometry import MultiPoint
+from google.oauth2 import service_account
+from ee import oauth
 
+
+#Helper functions. List all of the helper function used to run streamlit
+#1. Initialization of GEE using service account key
+def init_gee():
+    """
+    Initialize the Earth Engine Account for each streamlit pages
+    """
+    if 'ee_initialized' not in st.session_state:
+        try:
+            service_account_keys = st.secrets["earthengine"]
+            credentials = service_account.Credentials.from_service_account_info(
+                service_account_keys, scopes = oauth.SCOPES
+            )
+            ee.Initialize(credentials)
+            st.session_state['ee_initialized'] = True
+            st.sidebar.success("Connected to GEE")
+        except Exception as e:
+            st.sidebar.error(f"GEE intialization failed: {e}")
+
+#called the function
+init_gee()
 #Based on early experiments, shapefile with complex geometry often cause issues in GEE
 #The following functions are used to handle the common geometry issues
 
+#2. Shapefile Validation. Validate common shapefile issues, such as too complex geometry, null geom, or invalid CRS
+
 class shapefile_validator:
     """
-    Handle shapefile validation
+    Handle shapefile validation from user upload. Used in module 1 for AOI, and module (3) and 4 for ROI analysis
+    Designed for point, multipoint, polygon, and multipolygon
     """
     def __init__(self, verbose=True):
         """
@@ -44,11 +69,11 @@ class shapefile_validator:
         gdf = self._fix_crs(gdf)
         if gdf is None:
             return None
-        # Remove invalid, empty, and null geometries
+        #Remove invalid, empty, and null geom
         gdf = self._clean_geometries(gdf)
         if gdf is None or len(gdf) == 0:
             return None
-        # Geometry-specific validation
+        #Geometry-specific validation
         if geometry in ["point", "mixed"]:
             gdf = self._validate_points(gdf)
         if geometry in ["polygon", "mixed"]:
@@ -75,23 +100,20 @@ class shapefile_validator:
                 self.log(f"CRS conversion failed: {e}", "error")
                 return None
         return gdf
-    
+    #Function to support the validation (validate_and_fix_geometry)
     def _clean_geometries(self, gdf):
         """Remove and fix invalid geometries"""
         original_count = len(gdf)
-        
         # Fix invalid geometries
         invalid_mask = ~gdf.geometry.is_valid
         if invalid_mask.any():
             self.log(f"Found {invalid_mask.sum()} invalid geometries. Fixing...", "warning")
             gdf.loc[invalid_mask, 'geometry'] = gdf.loc[invalid_mask, 'geometry'].apply(make_valid)
-        
         # Remove empty geometries
         empty_mask = gdf.geometry.is_empty
         if empty_mask.any():
             self.log(f"Found {empty_mask.sum()} empty geometries. Removing...", "warning")
             gdf = gdf[~empty_mask].copy()
-        
         # Remove null geometries
         null_mask = gdf.geometry.isnull()
         if null_mask.any():
@@ -103,7 +125,7 @@ class shapefile_validator:
             self.log(f"Removed {original_count - len(gdf)} invalid geometries")
             
         return gdf
-    
+    #Function to support the validation (validate_and_fix_geometry). For point data
     def _validate_points(self, gdf):
         """Validate point geometries"""
         point_mask = gdf.geometry.geom_type.isin(['Point', 'MultiPoint'])
@@ -140,7 +162,7 @@ class shapefile_validator:
             self.log(f"Removed {len(indices_to_remove)} features with invalid coordinates")
             
         return gdf
-    
+    #Function to support the validation (validate_and_fix_geometry). For polygon data. Complex polygon shape (with a lot of vertex, will be simplified here)
     def _validate_polygons(self, gdf):
         """Validate and simplify polygon geometries"""
         poly_mask = gdf.geometry.geom_type.isin(['Polygon', 'MultiPolygon'])
@@ -158,11 +180,11 @@ class shapefile_validator:
                 gdf.loc[idx, 'geometry'] = geom.simplify(tolerance=0.001, preserve_topology=True)
                 
         return gdf
-    
+    #check if the coordinate is invalid
     def _is_valid_coordinate(self, x, y):
         """Check if coordinates are within valid lat/lon ranges"""
         return (-180 <= x <= 180) and (-90 <= y <= 90)
-    
+    #vertex calculation. Determine complexity of a geometry
     def _count_vertices(self, geom):
         """Count vertices in a geometry"""
         if hasattr(geom, 'exterior'):
@@ -194,7 +216,11 @@ class shapefile_validator:
             
         return True
     
-#Functions to convert geodataframe into EE object
+#3. Functions to convert geodataframe into EE geometry
+#Several option is presented here:
+#a. direct conversion for single geometry (geemap function is utilzed here)
+#b. if failed, use manual geojson conversion. 
+#c. If that failed too, use a failback system by creating a bounding box around AOI, while using a simplified version of the AOI
 class EE_converter:
     """
     Handle shapefile conversion from geodataframe to earth engine object
@@ -224,20 +250,17 @@ class EE_converter:
             return aoi
         except Exception as e:
             self.log(f"geemap conversion failed: {e}", "warning")
-                
             try:
-                    #If failed, use Manual conversion via GeoJSON
+                #If failed, use Manual conversion via GeoJSON
                 self.log("Trying manual GeoJSON conversion...")
-                    
-                    # Union multiple geometries if present
+                #Union multiple geometries if present
                 if len(gdf) > 1:
                         self.log("Multiple features found. Creating union...")
                         union_geom = gdf.geometry.unary_union
                         gdf = gpd.GeoDataFrame([{'geometry': union_geom}], crs=gdf.crs)
                     
-                    # Convert to GeoJSON
+                #Convert to GeoJSON
                 geojson = json.loads(gdf.to_json())
-                    
                 if geojson['features']:
                     geometry = geojson['features'][0]['geometry']
                         
@@ -251,11 +274,11 @@ class EE_converter:
                             self.log(f"Unsupported geometry type: {geometry['type']}", "error")
                             return None
                         
-                    self.log("Successfully converted using manual method", "success")
+                    self.log("Successfully converted using GEOJSON manual method", "success")
                     return aoi
                         
             except Exception as e2:
-                self.log(f"Manual conversion also failed: {e2}", "error")
+                self.log(f"GEOJSON Manual conversion also failed: {e2}", "error")
                     
                 try:
                     #Final attempt, create bounding box around the geometries
@@ -271,7 +294,7 @@ class EE_converter:
 #Conversion for Multi Geometry (ROI)     
     def convert_roi_gdf(self, gdf):
         """
-    Convert geodataframe into EE feture collection, build for the region of interest (ROI) data
+        Convert geodataframe into EE feture collection, build for the region of interest (ROI) data
          """
         try:
             self.log("Converting training data to Earth Engine FeatureCollection...")
@@ -345,3 +368,4 @@ class EE_converter:
         except Exception as e:
             self.log(f"Failed to convert training data: {e}", "error")
             return None
+
